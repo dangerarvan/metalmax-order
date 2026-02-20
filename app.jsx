@@ -137,7 +137,7 @@ function getTrimImage(name, categories) {
   return null;
 }
 
-const PIPE_BOOT_SIZES = ['1"','1.5"','2"','3"','4"','6"'];
+const PIPE_BOOT_SIZES = ['#101 - .75" to 2.75"','#3 - .25" to 5" GRAY','#3 - .25" to 4" RED HI-TEMP','#5 - 4.25" to 7.25"','#8 - 7" to 13"','Other (specify size)'];
 const RIVET_COLORS = ["Matching Panel Color","Matching Trim Color","Galvalume","White","Black","Brown"];
 
 const FEET_OPTIONS = Array.from({ length: 51 }, (_, i) => i);
@@ -332,6 +332,7 @@ function MetalMaxOrderForm() {
   const [pipeBoots, setPipeBoots] = useState(false);
   const [pipeBootSize, setPipeBootSize] = useState("");
   const [pipeBootQty, setPipeBootQty] = useState(0);
+  const [pipeBootOther, setPipeBootOther] = useState("");
   const [rivets, setRivets] = useState(false);
   const [rivetColor, setRivetColor] = useState("");
   const [rivetQty, setRivetQty] = useState(0);
@@ -359,7 +360,7 @@ function MetalMaxOrderForm() {
     return p.panel && p.gauge && p.color && p.pieceCount > 0 && p.feet !== "" && (!needs || p.surface);
   });
 
-  const toggleTrim = (t) => { setTrimItems((prev) => { const ex = prev.find((i) => i.name === t); if (ex) return prev.filter((i) => i.name !== t); return [...prev, { name: t, qty: 1, feet: "", inches: "" }]; }); };
+  const toggleTrim = (t) => { setTrimItems((prev) => { const ex = prev.find((i) => i.name === t); if (ex) return prev.filter((i) => i.name !== t); return [...prev, { name: t, qty: 1, feet: "10", inches: "6" }]; }); };
   const updateTrimItem = (name, field, value) => { setTrimItems((prev) => prev.map((i) => (i.name === name ? { ...i, [field]: value } : i))); };
 
   const STEPS = [
@@ -376,7 +377,10 @@ function MetalMaxOrderForm() {
     const fp = panelEntries[0];
     const trimColorDisplay = sameColorTrim ? `Same as panel (${fp?.color || "N/A"})` : trimColor;
     const trimListHTML = trimItems.length > 0
-      ? trimItems.map((t) => `<tr><td style="padding:6px 10px;border-bottom:1px solid #ddd">${t.name}</td><td style="padding:6px 10px;border-bottom:1px solid #ddd;text-align:center">${t.qty}</td><td style="padding:6px 10px;border-bottom:1px solid #ddd;text-align:center">${t.feet || 0}'${t.inches ? ` ${t.inches}"` : ""}</td></tr>`).join("")
+      ? trimItems.map((t) => {
+          const len = (t.feet === "10" && t.inches === "6") ? 'Standard (10\' 6")' : `${t.feet || 0}'${t.inches ? ` ${t.inches}"` : ""}`;
+          return `<tr><td style="padding:6px 10px;border-bottom:1px solid #ddd">${t.name}</td><td style="padding:6px 10px;border-bottom:1px solid #ddd;text-align:center">${t.qty}</td><td style="padding:6px 10px;border-bottom:1px solid #ddd;text-align:center">${len}</td></tr>`;
+        }).join("")
       : '<tr><td colspan="3" style="padding:10px;color:#999;text-align:center">No trim selected</td></tr>';
 
     const acc = [];
@@ -384,7 +388,10 @@ function MetalMaxOrderForm() {
     if (screws) acc.push("Screws");
     if (solarSeal) acc.push("Solar Seal");
     if (butylTape) acc.push("Butyl Tape");
-    if (pipeBoots && pipeBootSize) acc.push(`Pipe Boots: ${pipeBootSize} × ${pipeBootQty}`);
+    if (pipeBoots && pipeBootSize) {
+      const bootDesc = pipeBootSize === "Other (specify size)" ? `Other: ${pipeBootOther || "N/A"}` : pipeBootSize;
+      acc.push(`Pipe Boots: ${bootDesc} × ${pipeBootQty}`);
+    }
     if (rivets && rivetColor) acc.push(`Rivets: ${rivetColor} × ${rivetQty}`);
 
     let sketchDataUrl = "";
@@ -486,6 +493,7 @@ function MetalMaxOrderForm() {
                 {!sameColorTrim && <Picker label="Trim Color" options={trimColorOptions} value={trimColor} onChange={setTrimColor} placeholder="Select trim color..." />}
                 <div style={styles.divider} />
                 <label style={styles.label}>Select Trim Pieces</label>
+                <p style={styles.trimNote}>All trim defaults to standard 10' 6" length. Adjust feet/inches only if a different length is needed.</p>
                 <div style={styles.trimGrid}>
                   {availableTrim.map((t) => {
                     const selected = trimItems.find((i) => i.name === t);
@@ -527,6 +535,12 @@ function MetalMaxOrderForm() {
               {pipeBoots && (
                 <div style={styles.accSubSection}>
                   <Picker label="Pipe Boot Size" options={PIPE_BOOT_SIZES} value={pipeBootSize} onChange={setPipeBootSize} placeholder="Select size..." />
+                  {pipeBootSize === "Other (specify size)" && (
+                    <div style={styles.fieldGroup}>
+                      <label style={styles.label}>Specify Size</label>
+                      <input type="text" value={pipeBootOther} onChange={(e) => setPipeBootOther(e.target.value)} style={styles.input} placeholder="Enter pipe boot size..." />
+                    </div>
+                  )}
                   <NumberPad label="Quantity" value={pipeBootQty} onChange={setPipeBootQty} />
                 </div>
               )}
@@ -669,6 +683,7 @@ const styles = {
   trimChip: { padding:"8px 12px",background:"#fff",border:"2px solid #e0e0dc",borderRadius:8,fontSize:14,cursor:"pointer",display:"flex",alignItems:"center",gap:8 },
   trimChipActive: { borderColor:"#e74c3c",background:"#fef5f4" },
   trimCheck: { width:20,height:20,borderRadius:4,border:"2px solid #ccc",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#e74c3c",flexShrink:0 },
+  trimNote: { fontSize:12,color:"#888",fontStyle:"italic",margin:"-2px 0 10px",lineHeight:1.4 },
   trimThumb: { width:44,height:44,objectFit:"contain",borderRadius:4,background:"#f5f5f0",flexShrink:0,border:"1px solid #eee" },
   trimDetail: { display:"flex",gap:8,padding:"8px 12px 12px",background:"#fef5f4",borderRadius:"0 0 8px 8px",marginTop:-2,borderLeft:"2px solid #e74c3c",borderRight:"2px solid #e74c3c",borderBottom:"2px solid #e74c3c" },
   accGrid: { display:"flex",flexDirection:"column",gap:2 },
