@@ -330,9 +330,7 @@ function MetalMaxOrderForm() {
   const [solarSeal, setSolarSeal] = useState(false);
   const [butylTape, setButylTape] = useState(false);
   const [pipeBoots, setPipeBoots] = useState(false);
-  const [pipeBootSize, setPipeBootSize] = useState("");
-  const [pipeBootQty, setPipeBootQty] = useState(0);
-  const [pipeBootOther, setPipeBootOther] = useState("");
+  const [pipeBootEntries, setPipeBootEntries] = useState([{ id: 1, size: "", qty: 0 }]);
   const [rivets, setRivets] = useState(false);
   const [rivetColor, setRivetColor] = useState("");
   const [rivetQty, setRivetQty] = useState(0);
@@ -388,9 +386,10 @@ function MetalMaxOrderForm() {
     if (screws) acc.push("Screws");
     if (solarSeal) acc.push("Solar Seal");
     if (butylTape) acc.push("Butyl Tape");
-    if (pipeBoots && pipeBootSize) {
-      const bootDesc = pipeBootSize === "Other (specify size)" ? `Other: ${pipeBootOther || "N/A"}` : pipeBootSize;
-      acc.push(`Pipe Boots: ${bootDesc} × ${pipeBootQty}`);
+    if (pipeBoots) {
+      pipeBootEntries.filter(b => b.size && b.qty > 0).forEach(b => {
+        acc.push(`Pipe Boot: ${b.size} × ${b.qty}`);
+      });
     }
     if (rivets && rivetColor) acc.push(`Rivets: ${rivetColor} × ${rivetQty}`);
 
@@ -534,14 +533,22 @@ function MetalMaxOrderForm() {
               <Checkbox label="Pipe Boots" checked={pipeBoots} onChange={setPipeBoots} />
               {pipeBoots && (
                 <div style={styles.accSubSection}>
-                  <Picker label="Pipe Boot Size" options={PIPE_BOOT_SIZES} value={pipeBootSize} onChange={setPipeBootSize} placeholder="Select size..." />
-                  {pipeBootSize === "Other (specify size)" && (
-                    <div style={styles.fieldGroup}>
-                      <label style={styles.label}>Specify Size</label>
-                      <input type="text" value={pipeBootOther} onChange={(e) => setPipeBootOther(e.target.value)} style={styles.input} placeholder="Enter pipe boot size..." />
+                  {pipeBootEntries.map((b, idx) => (
+                    <div key={b.id} style={styles.pipeBootCard}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 6 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: "#1a1a2e", flex: 1 }}>Boot {idx + 1}</span>
+                        {pipeBootEntries.length > 1 && (
+                          <button style={styles.panelCardRemove} onClick={() => setPipeBootEntries(prev => prev.filter(x => x.id !== b.id))}>✕</button>
+                        )}
+                      </div>
+                      <Picker label="Size" options={PIPE_BOOT_SIZES} value={b.size} onChange={(v) => setPipeBootEntries(prev => prev.map(x => x.id === b.id ? { ...x, size: v } : x))} placeholder="Select size..." />
+                      <NumberPad label="Qty" value={b.qty} onChange={(v) => setPipeBootEntries(prev => prev.map(x => x.id === b.id ? { ...x, qty: v } : x))} />
                     </div>
-                  )}
-                  <NumberPad label="Quantity" value={pipeBootQty} onChange={setPipeBootQty} />
+                  ))}
+                  <button style={{ ...styles.addPanelBtn, marginTop: 4, padding: "10px", fontSize: 13 }}
+                    onClick={() => setPipeBootEntries(prev => [...prev, { id: Date.now(), size: prev[prev.length - 1]?.size || "", qty: 0 }])}>
+                    <span style={{ ...styles.addPanelIcon, width: 22, height: 22, fontSize: 15 }}>+</span> Add Another Size
+                  </button>
                 </div>
               )}
               <Checkbox label="Rivets" checked={rivets} onChange={setRivets} />
@@ -588,7 +595,8 @@ function MetalMaxOrderForm() {
               <div style={styles.summaryRow}><span>Trim Pieces:</span><strong>{trimItems.length}</strong></div>
               <div style={styles.summaryRow}><span>Accessories:</span><strong>
                 {[closureStrips&&"Closure",screws&&"Screws",solarSeal&&"Solar Seal",butylTape&&"Butyl",
-                  pipeBoots&&`Boots(${pipeBootQty})`,rivets&&`Rivets(${rivetQty})`].filter(Boolean).join(", ")||"None"}
+                  ...(pipeBoots ? pipeBootEntries.filter(b=>b.size&&b.qty>0).map(b=>`Boot ${b.size}(${b.qty})`) : []),
+                  rivets&&`Rivets(${rivetQty})`].filter(Boolean).join(", ")||"None"}
               </strong></div>
               {comments.trim() && (
                 <div style={styles.summaryRow}><span>Notes:</span><strong style={{maxWidth:180,textAlign:"right"}}>{comments.length>50?comments.slice(0,50)+"...":comments}</strong></div>
@@ -688,6 +696,7 @@ const styles = {
   trimDetail: { display:"flex",gap:8,padding:"8px 12px 12px",background:"#fef5f4",borderRadius:"0 0 8px 8px",marginTop:-2,borderLeft:"2px solid #e74c3c",borderRight:"2px solid #e74c3c",borderBottom:"2px solid #e74c3c" },
   accGrid: { display:"flex",flexDirection:"column",gap:2 },
   accSubSection: { paddingLeft:36,paddingBottom:8 },
+  pipeBootCard: { background:"#fff",border:"1px solid #e0e0dc",borderRadius:8,padding:10,marginBottom:8 },
   noPanel: { color:"#999",fontStyle:"italic",padding:20,textAlign:"center" },
   // Summary
   summaryBox: { background:"#fff",border:"2px solid #e0e0dc",borderRadius:12,padding:16 },
