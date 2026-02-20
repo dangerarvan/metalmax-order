@@ -25,7 +25,7 @@ const COLORS_BY_GAUGE = {
 };
 
 const TRIM_BY_CATEGORY = {
-  "Standing Seam": ["14Z Bar","16Z Bar","Box Rake","Cleat","Counter Flashing","End Wall","Flush Eave","Hip Cap","Offset Cleat","Pitch Change","Plumb Eave","Reglet Flashing","Side Wall","Single Slope Ridge","Square Eave","Step Rake 14","Step Rake 16","Step Ridge","Valley","Vent Retainer"],
+  "Standing Seam": ["14Z Bar","16Z Bar","Box Rake","Cleat","Counter Flashing","End Wall","Flush Eave","Hip Cap","Offset Cleat","Pitch Change/Transition","Plumb Eave","Reglet Flashing","Side Wall","Single Slope Ridge","Square Eave","Step Rake 14","Step Rake 16","Step Ridge","Valley","Vent Retainer"],
   "PBR": ["Base Trim","Box Rake","Double Angle","End Wall","Flat Sheet","Formed Ridge Cap","Hi-Side Eave","Hi-Side Parapet","House Rake","Inside Corner","Inside Single Angle","J-Trim","Jamb Header","Jamb Trim","Long Eave Trim","Outside Corner","Outside Single Angle","Rake","Rat Guard","Short Eave","Side Wall","Skylight Trim","Tie-In","Universal Ridge","Valley","Wide Valley","Window Cap"],
   "Max Panel": ["Barn Rake","Barn Ridge","Door Edge","Door Jamb Wide","Door Post","Double Angle","End Wall","Fascia","Flat Sheet","Gable","Gutter Apron","Inside Corner","Inside Single Angle","J-Trim","Keystone","Large Corner","Lower Gambrel","Outside Single Angle","Overhead Door Jamb","OH Door Jamb w/ Drip Edge","Rat Guard","Residential Drip Edge","Residential Eave","Residential Hip Cap","Residential Rake","Residential Ridge Cap","Residential Valley","Round Track Cover","Side Wall","Small Corner","Soffit","Square Base","Square Track Cover Narrow","Upper Gambrel","Wide Ridgecap","Window Cap"],
 };
@@ -44,7 +44,7 @@ const SS_IMAGES = {
   "Flush Eave": CDN+"Standing-Seam-Trim-Spec-SS-Flush-Eave.png",
   "Hip Cap": CDN+"Standing-Seam-Trim-Spec-SS-Hip-Cap.png",
   "Offset Cleat": CDN+"Standing-Seam-Trim-Spec-SS-Offset-Cleat.png",
-  "Pitch Change": CDN+"Standing-Seam-Trim-Spec-SS-Pitch-Change-1.png",
+  "Pitch Change/Transition": CDN+"Standing-Seam-Trim-Spec-SS-Pitch-Change-1.png",
   "Plumb Eave": CDN+"Standing-Seam-Trim-Spec-SS-Plumb-Eave-1.png",
   "Reglet Flashing": CDN+"Standing-Seam-Trim-Spec-SS-Reglet-Flashing-1.png",
   "Side Wall": CDN+"Standing-Seam-Trim-Spec-SS-Side-Wall-1.png",
@@ -138,6 +138,34 @@ function getTrimImage(name, categories) {
 }
 
 const PIPE_BOOT_SIZES = ['#101 - .75" to 2.75"','#3 - .25" to 5" GRAY','#3 - .25" to 4" RED HI-TEMP','#5 - 4.25" to 7.25"','#8 - 7" to 13"','Other (specify size)'];
+
+// ─── PITCH OPTIONS ───────────────────────────────────────────────────────────
+const PITCH_OPTIONS = Array.from({ length: 18 }, (_, i) => `${i + 1}/12`);
+
+// Which trim pieces need a pitch field, keyed by category
+const NEEDS_PITCH = {
+  "Standing Seam": ["End Wall","Flush Eave","Hip Cap","Pitch Change/Transition","Plumb Eave","Single Slope Ridge","Valley","Vent Retainer"],
+  "PBR": ["End Wall","Hi-Side Parapet","Universal Ridge","Valley","Wide Valley"],
+  "Max Panel": ["End Wall","Fascia","Residential Eave","Residential Hip Cap","Residential Ridge Cap","Residential Valley","Upper Gambrel"],
+};
+
+// Special trim behaviors
+const NEEDS_TRANSITION_PITCH = ["Pitch Change/Transition"]; // needs a second "transition to" pitch
+const NEEDS_CLEATED = { "Standing Seam": ["Valley"] }; // Valley in SS gets a "cleated" checkbox
+
+// Exposed fastener panel categories (for ridge vent type)
+const EXPOSED_FASTENER_CATS = ["PBR", "Max Panel"];
+const HIDDEN_FASTENER_CATS = ["Standing Seam"];
+
+function trimNeedsPitch(name, categories) {
+  return categories.some(cat => (NEEDS_PITCH[cat] || []).includes(name));
+}
+function trimNeedsTransitionPitch(name) {
+  return NEEDS_TRANSITION_PITCH.includes(name);
+}
+function trimNeedsCleated(name, categories) {
+  return categories.some(cat => (NEEDS_CLEATED[cat] || []).includes(name));
+}
 const RIVET_COLORS = ["Matching Panel Color","Matching Trim Color","Galvalume","White","Black","Brown"];
 
 const FEET_OPTIONS = Array.from({ length: 51 }, (_, i) => i);
@@ -323,6 +351,9 @@ function MetalMaxOrderForm() {
   const [sameColorTrim, setSameColorTrim] = useState(true);
   const [trimColor, setTrimColor] = useState("");
   const [trimItems, setTrimItems] = useState([]);
+  const [ridgeVent, setRidgeVent] = useState(false);
+  const [flexProQty, setFlexProQty] = useState(0);
+  const [snapZQty, setSnapZQty] = useState(0);
 
   // Step 4: Accessories
   const [closureStrips, setClosureStrips] = useState(false);
@@ -345,6 +376,8 @@ function MetalMaxOrderForm() {
   const availableTrim = allTrimCategories.reduce((acc, cat) => { (TRIM_BY_CATEGORY[cat] || []).forEach((t) => { if (!acc.includes(t)) acc.push(t); }); return acc; }, []);
   const trimGauge = firstComplete?.gauge;
   const trimColorOptions = trimGauge ? (COLORS_BY_GAUGE[trimGauge] || []).sort() : [];
+  const hasExposed = allTrimCategories.some(c => EXPOSED_FASTENER_CATS.includes(c));
+  const hasHidden = allTrimCategories.some(c => HIDDEN_FASTENER_CATS.includes(c));
 
   const updatePanelEntry = (updated) => setPanelEntries((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
   const removePanelEntry = (id) => setPanelEntries((prev) => prev.filter((p) => p.id !== id));
@@ -358,7 +391,7 @@ function MetalMaxOrderForm() {
     return p.panel && p.gauge && p.color && p.pieceCount > 0 && p.feet !== "" && (!needs || p.surface);
   });
 
-  const toggleTrim = (t) => { setTrimItems((prev) => { const ex = prev.find((i) => i.name === t); if (ex) return prev.filter((i) => i.name !== t); return [...prev, { name: t, qty: 1, feet: "10", inches: "6" }]; }); };
+  const toggleTrim = (t) => { setTrimItems((prev) => { const ex = prev.find((i) => i.name === t); if (ex) return prev.filter((i) => i.name !== t); return [...prev, { name: t, qty: 1, feet: "10", inches: "6", pitch: "", pitchTo: "", cleated: false }]; }); };
   const updateTrimItem = (name, field, value) => { setTrimItems((prev) => prev.map((i) => (i.name === name ? { ...i, [field]: value } : i))); };
 
   const STEPS = [
@@ -376,6 +409,7 @@ function MetalMaxOrderForm() {
     setCustomerName(""); setPoNumber(""); setCustomerContact(""); setOrderType("Sales Order");
     setPanelEntries([newPanel()]);
     setSameColorTrim(true); setTrimColor(""); setTrimItems([]);
+    setRidgeVent(false); setFlexProQty(0); setSnapZQty(0);
     setClosureStrips(false); setScrews(false); setSolarSeal(false); setButylTape(false);
     setPipeBoots(false); setPipeBootEntries([{ id: 1, size: "", qty: 0 }]);
     setRivets(false); setRivetColor(""); setRivetQty(0);
@@ -390,10 +424,23 @@ function MetalMaxOrderForm() {
     const trimColorDisplay = sameColorTrim ? `Same as panel (${fp?.color || "N/A"})` : trimColor;
     const trimListHTML = trimItems.length > 0
       ? trimItems.map((t) => {
-          const len = (t.feet === "10" && t.inches === "6") ? 'Standard (10\' 6")' : `${t.feet || 0}'${t.inches ? ` ${t.inches}"` : ""}`;
-          return `<tr><td style="padding:6px 10px;border-bottom:1px solid #ddd">${t.name}</td><td style="padding:6px 10px;border-bottom:1px solid #ddd;text-align:center">${t.qty}</td><td style="padding:6px 10px;border-bottom:1px solid #ddd;text-align:center">${len}</td></tr>`;
+          const len = (t.feet === "10" && t.inches === "6") ? 'Std 10\' 6"' : `${t.feet || 0}'${t.inches ? ` ${t.inches}"` : ""}`;
+          const notes = [];
+          if (t.pitch) notes.push(t.pitchTo ? `Pitch: ${t.pitch} to ${t.pitchTo}` : `Pitch: ${t.pitch}`);
+          if (t.cleated) notes.push("Cleated");
+          const noteStr = notes.length ? `<br><small style="color:#666">${notes.join(", ")}</small>` : "";
+          return `<tr><td style="padding:6px 10px;border-bottom:1px solid #ddd">${t.name}${noteStr}</td><td style="padding:6px 10px;border-bottom:1px solid #ddd;text-align:center">${t.qty}</td><td style="padding:6px 10px;border-bottom:1px solid #ddd;text-align:center">${len}</td></tr>`;
         }).join("")
       : '<tr><td colspan="3" style="padding:10px;color:#999;text-align:center">No trim selected</td></tr>';
+
+    // Ridge vent line in trim section
+    let ridgeVentHTML = "";
+    if (ridgeVent) {
+      const parts = [];
+      if (hasExposed && flexProQty > 0) parts.push(`FlexPro: ${flexProQty} LF`);
+      if (hasHidden && snapZQty > 0) parts.push(`Snap Z: ${snapZQty} LF`);
+      if (parts.length) ridgeVentHTML = `<div class="info-row" style="margin-top:8px"><span class="info-label">Ridge Vent:</span> ${parts.join(", ")}</div>`;
+    }
 
     const acc = [];
     if (closureStrips) acc.push("Closure Strips");
@@ -425,7 +472,8 @@ function MetalMaxOrderForm() {
         <table><thead><tr><th>#</th><th>Panel</th><th style="text-align:center">Gauge</th><th>Color</th><th style="text-align:center">Qty</th><th style="text-align:center">Length</th></tr></thead><tbody>${panelsHTML}</tbody></table></div>
       <div class="section"><div class="section-title">Trim Pieces</div>
         <div class="info-row" style="margin-bottom:8px"><span class="info-label">Trim Color:</span> ${trimColorDisplay||"N/A"}</div>
-        <table><thead><tr><th>Trim Piece</th><th style="text-align:center">Qty</th><th style="text-align:center">Length</th></tr></thead><tbody>${trimListHTML}</tbody></table></div>
+        <table><thead><tr><th>Trim Piece</th><th style="text-align:center">Qty</th><th style="text-align:center">Length</th></tr></thead><tbody>${trimListHTML}</tbody></table>
+        ${ridgeVentHTML}</div>
       <div class="section"><div class="section-title">Accessories</div>
         ${acc.length?`<div class="acc-list">${acc.map(a=>`<div class="acc-item">${a}</div>`).join("")}</div>`:'<p style="color:#999">None selected</p>'}</div>
       ${hasCustomTrim&&sketchDataUrl?`<div class="section"><div class="section-title">Custom Trim Sketch</div><img src="${sketchDataUrl}" class="sketch-img" /></div>`:""}
@@ -520,6 +568,9 @@ function MetalMaxOrderForm() {
                   {availableTrim.map((t) => {
                     const selected = trimItems.find((i) => i.name === t);
                     const imgUrl = getTrimImage(t, allTrimCategories);
+                    const showPitch = selected && trimNeedsPitch(t, allTrimCategories);
+                    const showTransition = selected && trimNeedsTransitionPitch(t);
+                    const showCleated = selected && trimNeedsCleated(t, allTrimCategories);
                     return (
                       <div key={t}>
                         <div style={{ ...styles.trimChip, ...(selected ? styles.trimChipActive : {}) }} onClick={() => toggleTrim(t)}>
@@ -528,16 +579,50 @@ function MetalMaxOrderForm() {
                           <span style={{ flex: 1 }}>{t}</span>
                         </div>
                         {selected && (
-                          <div style={styles.trimDetail}>
-                            <div style={{ flex: "0 0 60px" }}><NumberPad label="Qty" value={selected.qty} onChange={(v) => updateTrimItem(t, "qty", v)} /></div>
-                            <div style={{ flex: 1 }}><Picker label="Ft" options={FEET_OPTIONS} value={selected.feet} onChange={(v) => updateTrimItem(t, "feet", v)} placeholder="Ft" /></div>
-                            <div style={{ flex: 1 }}><Picker label="In" options={INCHES_OPTIONS} value={selected.inches} onChange={(v) => updateTrimItem(t, "inches", v)} placeholder="In" /></div>
+                          <div style={styles.trimDetailWrap}>
+                            <div style={styles.trimDetail}>
+                              <div style={{ flex: "0 0 60px" }}><NumberPad label="Qty" value={selected.qty} onChange={(v) => updateTrimItem(t, "qty", v)} /></div>
+                              <div style={{ flex: 1 }}><Picker label="Ft" options={FEET_OPTIONS} value={selected.feet} onChange={(v) => updateTrimItem(t, "feet", v)} placeholder="Ft" /></div>
+                              <div style={{ flex: 1 }}><Picker label="In" options={INCHES_OPTIONS} value={selected.inches} onChange={(v) => updateTrimItem(t, "inches", v)} placeholder="In" /></div>
+                            </div>
+                            {showPitch && (
+                              <div style={styles.trimExtraRow}>
+                                <div style={{ flex: 1 }}>
+                                  <Picker label={showTransition ? "From Pitch" : "Pitch"} options={PITCH_OPTIONS} value={selected.pitch} onChange={(v) => updateTrimItem(t, "pitch", v)} placeholder="Select pitch..." />
+                                </div>
+                                {showTransition && (
+                                  <div style={{ flex: 1 }}>
+                                    <Picker label="To Pitch" options={PITCH_OPTIONS} value={selected.pitchTo} onChange={(v) => updateTrimItem(t, "pitchTo", v)} placeholder="Select pitch..." />
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                            {showCleated && (
+                              <div style={styles.trimExtraRow}>
+                                <Checkbox label="Cleated valley" checked={selected.cleated} onChange={(v) => updateTrimItem(t, "cleated", v)} />
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
                     );
                   })}
                 </div>
+
+                {/* ─── RIDGE VENT ─── */}
+                <div style={styles.divider} />
+                <label style={styles.label}>Ridge Vent</label>
+                <Checkbox label={hasExposed && hasHidden ? "Ridge Vent (FlexPro + Snap Z)" : hasExposed ? "Ridge Vent (FlexPro)" : "Ridge Vent (Snap Z)"} checked={ridgeVent} onChange={setRidgeVent} />
+                {ridgeVent && (
+                  <div style={styles.accSubSection}>
+                    {hasExposed && (
+                      <NumberPad label="FlexPro - Linear Feet" value={flexProQty} onChange={setFlexProQty} />
+                    )}
+                    {hasHidden && (
+                      <NumberPad label="Snap Z - Linear Feet" value={snapZQty} onChange={setSnapZQty} />
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -616,6 +701,11 @@ function MetalMaxOrderForm() {
               ))}
               <div style={styles.summaryDivider} />
               <div style={styles.summaryRow}><span>Trim Pieces:</span><strong>{trimItems.length}</strong></div>
+              {ridgeVent && (
+                <div style={styles.summaryRow}><span>Ridge Vent:</span><strong>
+                  {[hasExposed && flexProQty > 0 && `FlexPro ${flexProQty}LF`, hasHidden && snapZQty > 0 && `SnapZ ${snapZQty}LF`].filter(Boolean).join(", ")}
+                </strong></div>
+              )}
               <div style={styles.summaryRow}><span>Accessories:</span><strong>
                 {[closureStrips&&"Closure",screws&&"Screws",solarSeal&&"Solar Seal",butylTape&&"Butyl",
                   ...(pipeBoots ? pipeBootEntries.filter(b=>b.size&&b.qty>0).map(b=>`Boot ${b.size}(${b.qty})`) : []),
@@ -717,7 +807,9 @@ const styles = {
   trimCheck: { width:20,height:20,borderRadius:4,border:"2px solid #ccc",display:"flex",alignItems:"center",justifyContent:"center",fontSize:12,fontWeight:700,color:"#e74c3c",flexShrink:0 },
   trimNote: { fontSize:12,color:"#888",fontStyle:"italic",margin:"-2px 0 10px",lineHeight:1.4 },
   trimThumb: { width:44,height:44,objectFit:"contain",borderRadius:4,background:"#f5f5f0",flexShrink:0,border:"1px solid #eee" },
-  trimDetail: { display:"flex",gap:8,padding:"8px 12px 12px",background:"#fef5f4",borderRadius:"0 0 8px 8px",marginTop:-2,borderLeft:"2px solid #e74c3c",borderRight:"2px solid #e74c3c",borderBottom:"2px solid #e74c3c" },
+  trimDetail: { display:"flex",gap:8,padding:"8px 12px",background:"#fef5f4",borderLeft:"2px solid #e74c3c",borderRight:"2px solid #e74c3c" },
+  trimDetailWrap: { marginTop:-2,borderLeft:"2px solid #e74c3c",borderRight:"2px solid #e74c3c",borderBottom:"2px solid #e74c3c",borderRadius:"0 0 8px 8px",background:"#fef5f4",overflow:"hidden" },
+  trimExtraRow: { display:"flex",gap:8,padding:"4px 12px 10px" },
   accGrid: { display:"flex",flexDirection:"column",gap:2 },
   accSubSection: { paddingLeft:36,paddingBottom:8 },
   pipeBootCard: { background:"#fff",border:"1px solid #e0e0dc",borderRadius:8,padding:10,marginBottom:8 },
