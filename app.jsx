@@ -383,146 +383,61 @@ function MetalMaxOrderForm() {
     if (canvasRef.current) { const ctx = canvasRef.current.getContext("2d"); ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height); }
   };
 
-  // ─── PDF (jsPDF) ─────────────────────────────────────────────────────────────
+  // ─── PDF ─────────────────────────────────────────────────────────────────────
   const generatePDF = async () => {
     setGenerating(true);
-    try {
-      const { jsPDF } = window.jspdf;
-      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "letter" });
-      const pw = doc.internal.pageSize.getWidth();
-      const margin = 15;
-      const cw = pw - margin * 2;
-      let y = margin;
+    const fp = panelEntries[0];
+    const trimColorDisplay = sameColorTrim ? `Same as panel (${fp?.color || "N/A"})` : trimColor;
+    const trimListHTML = trimItems.length > 0
+      ? trimItems.map((t) => {
+          const len = (t.feet === "10" && t.inches === "6") ? 'Standard (10\' 6")' : `${t.feet || 0}'${t.inches ? ` ${t.inches}"` : ""}`;
+          return `<tr><td style="padding:6px 10px;border-bottom:1px solid #ddd">${t.name}</td><td style="padding:6px 10px;border-bottom:1px solid #ddd;text-align:center">${t.qty}</td><td style="padding:6px 10px;border-bottom:1px solid #ddd;text-align:center">${len}</td></tr>`;
+        }).join("")
+      : '<tr><td colspan="3" style="padding:10px;color:#999;text-align:center">No trim selected</td></tr>';
 
-      const brandRed = [192, 57, 43];
-      const darkBlue = [26, 26, 46];
-      const headerTitle = orderType === "Quote" ? "METALMAX QUOTE" : "METALMAX SALES ORDER";
-      const dateStr = new Date().toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+    const acc = [];
+    if (closureStrips) acc.push("Closure Strips");
+    if (screws) acc.push("Screws");
+    if (solarSeal) acc.push("Solar Seal");
+    if (butylTape) acc.push("Butyl Tape");
+    if (pipeBoots) { pipeBootEntries.filter(b => b.size && b.qty > 0).forEach(b => { acc.push(`Pipe Boot: ${b.size} x ${b.qty}`); }); }
+    if (rivets && rivetColor) acc.push(`Rivets: ${rivetColor} x ${rivetQty}`);
 
-      // Helper: check page break
-      const checkPage = (needed) => { if (y + needed > doc.internal.pageSize.getHeight() - 15) { doc.addPage(); y = margin; } };
+    let sketchDataUrl = "";
+    if (hasCustomTrim && canvasRef.current) sketchDataUrl = canvasRef.current.toDataURL("image/png");
 
-      // ── Header ──
-      doc.setFontSize(20); doc.setTextColor(...brandRed); doc.setFont(undefined, "bold");
-      doc.text(headerTitle, margin, y + 7);
-      doc.setFontSize(10); doc.setTextColor(100); doc.setFont(undefined, "normal");
-      doc.text(dateStr, pw - margin, y + 7, { align: "right" });
-      y += 12;
-      doc.setDrawColor(...brandRed); doc.setLineWidth(0.8); doc.line(margin, y, pw - margin, y);
-      y += 8;
+    const panelsHTML = panelEntries.map((p, i) => {
+      const surf = PANELS[p.panel]?.isStandingSeam && p.surface ? `<br><small style="color:#666">${p.surface}</small>` : "";
+      return `<tr><td style="padding:6px 10px;border-bottom:1px solid #ddd">${i+1}</td><td style="padding:6px 10px;border-bottom:1px solid #ddd">${p.panel}${surf}</td><td style="padding:6px 10px;border-bottom:1px solid #ddd;text-align:center">${p.gauge}ga</td><td style="padding:6px 10px;border-bottom:1px solid #ddd">${p.color}</td><td style="padding:6px 10px;border-bottom:1px solid #ddd;text-align:center">${p.pieceCount}</td><td style="padding:6px 10px;border-bottom:1px solid #ddd;text-align:center">${p.feet}'${p.inches?` ${p.inches}"`:""}</td></tr>`;
+    }).join("");
 
-      // ── Section helper ──
-      const sectionTitle = (title) => {
-        checkPage(14);
-        doc.setFontSize(11); doc.setTextColor(...brandRed); doc.setFont(undefined, "bold");
-        doc.text(title, margin, y); y += 1;
-        doc.setDrawColor(220); doc.setLineWidth(0.3); doc.line(margin, y, pw - margin, y);
-        y += 5;
-      };
-
-      const infoRow = (label, value) => {
-        checkPage(6);
-        doc.setFontSize(9); doc.setFont(undefined, "bold"); doc.setTextColor(...darkBlue);
-        doc.text(label, margin, y);
-        doc.setFont(undefined, "normal"); doc.setTextColor(60);
-        doc.text(value || "N/A", margin + 30, y);
-        y += 5;
-      };
-
-      // ── Customer Info ──
-      sectionTitle("CUSTOMER INFORMATION");
-      infoRow("Customer:", customerName);
-      infoRow("PO #:", poNumber || "N/A");
-      infoRow("Contact:", customerContact || "N/A");
-      infoRow("Type:", orderType);
-      y += 4;
-
-      // ── Panel Order ──
-      sectionTitle("PANEL ORDER" + (panelEntries.length > 1 ? ` (${panelEntries.length} panels)` : ""));
-      const panelRows = panelEntries.map((p, i) => {
-        const surf = PANELS[p.panel]?.isStandingSeam && p.surface ? ` (${p.surface})` : "";
-        return [String(i + 1), p.panel + surf, p.gauge + "ga", p.color, String(p.pieceCount), `${p.feet}'${p.inches ? ` ${p.inches}"` : ""}`];
-      });
-      doc.autoTable({
-        startY: y, margin: { left: margin, right: margin },
-        head: [["#", "Panel", "Gauge", "Color", "Qty", "Length"]],
-        body: panelRows,
-        headStyles: { fillColor: brandRed, fontSize: 8, fontStyle: "bold" },
-        bodyStyles: { fontSize: 8, textColor: darkBlue },
-        alternateRowStyles: { fillColor: [248, 248, 245] },
-        columnStyles: { 0: { cellWidth: 8 }, 2: { halign: "center", cellWidth: 14 }, 4: { halign: "center", cellWidth: 12 }, 5: { halign: "center", cellWidth: 18 } },
-        theme: "grid",
-      });
-      y = doc.lastAutoTable.finalY + 6;
-
-      // ── Trim Pieces ──
-      sectionTitle("TRIM PIECES");
-      const fp = panelEntries[0];
-      const trimColorDisplay = sameColorTrim ? `Same as panel (${fp?.color || "N/A"})` : trimColor;
-      infoRow("Trim Color:", trimColorDisplay || "N/A");
-      if (trimItems.length > 0) {
-        const trimRows = trimItems.map((t) => {
-          const len = (t.feet === "10" && t.inches === "6") ? 'Std 10\' 6"' : `${t.feet || 0}'${t.inches ? ` ${t.inches}"` : ""}`;
-          return [t.name, String(t.qty), len];
-        });
-        doc.autoTable({
-          startY: y, margin: { left: margin, right: margin },
-          head: [["Trim Piece", "Qty", "Length"]],
-          body: trimRows,
-          headStyles: { fillColor: brandRed, fontSize: 8, fontStyle: "bold" },
-          bodyStyles: { fontSize: 8, textColor: darkBlue },
-          alternateRowStyles: { fillColor: [248, 248, 245] },
-          columnStyles: { 1: { halign: "center", cellWidth: 14 }, 2: { halign: "center", cellWidth: 22 } },
-          theme: "grid",
-        });
-        y = doc.lastAutoTable.finalY + 6;
-      } else {
-        doc.setFontSize(9); doc.setTextColor(150); doc.text("No trim selected", margin, y); y += 8;
-      }
-
-      // ── Accessories ──
-      sectionTitle("ACCESSORIES");
-      const accList = [];
-      if (closureStrips) accList.push("Closure Strips");
-      if (screws) accList.push("Screws");
-      if (solarSeal) accList.push("Solar Seal");
-      if (butylTape) accList.push("Butyl Tape");
-      if (pipeBoots) { pipeBootEntries.filter(b => b.size && b.qty > 0).forEach(b => { accList.push(`Pipe Boot: ${b.size} × ${b.qty}`); }); }
-      if (rivets && rivetColor) accList.push(`Rivets: ${rivetColor} × ${rivetQty}`);
-      if (accList.length > 0) {
-        accList.forEach((a) => { checkPage(5); doc.setFontSize(9); doc.setTextColor(...darkBlue); doc.text("✓  " + a, margin, y); y += 5; });
-      } else {
-        doc.setFontSize(9); doc.setTextColor(150); doc.text("None selected", margin, y);
-      }
-      y += 6;
-
-      // ── Custom Trim Sketch ──
-      if (hasCustomTrim && canvasRef.current) {
-        sectionTitle("CUSTOM TRIM SKETCH");
-        checkPage(50);
-        const imgData = canvasRef.current.toDataURL("image/png");
-        doc.addImage(imgData, "PNG", margin, y, cw, cw * 0.6);
-        y += cw * 0.6 + 6;
-      }
-
-      // ── Notes ──
-      if (comments.trim()) {
-        sectionTitle("ADDITIONAL NOTES / MEASUREMENTS");
-        checkPage(12);
-        doc.setFontSize(9); doc.setTextColor(60); doc.setFont(undefined, "normal");
-        const lines = doc.splitTextToSize(comments, cw);
-        lines.forEach((line) => { checkPage(5); doc.text(line, margin, y); y += 4.5; });
-      }
-
-      // ── Save ──
-      const safeName = customerName.replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30) || "order";
-      const typeTag = orderType === "Quote" ? "Quote" : "SO";
-      const fileName = `MetalMax_${typeTag}_${safeName}.pdf`;
-      doc.save(fileName);
-    } catch (err) {
-      console.error("PDF generation error:", err);
-      alert("Error generating PDF. Please try again.");
-    }
+    const headerTitle = orderType === "Quote" ? "METALMAX QUOTE" : "METALMAX SALES ORDER";
+    const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><title>${headerTitle} - ${customerName}</title>
+    <style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:'Helvetica Neue',Arial,sans-serif;padding:30px;color:#1a1a2e;font-size:13px}.header{display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid #c0392b;padding-bottom:15px;margin-bottom:20px}.header h1{font-size:22px;color:#c0392b;letter-spacing:1px}.header .date{font-size:12px;color:#666}.section{margin-bottom:18px}.section-title{font-size:14px;font-weight:700;color:#c0392b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid #eee}.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 20px}.info-row{display:flex;gap:6px}.info-label{font-weight:600;min-width:100px}table{width:100%;border-collapse:collapse}th{background:#c0392b;color:#fff;padding:8px 10px;text-align:left;font-size:12px}.acc-list{display:flex;gap:15px;flex-wrap:wrap}.acc-item{padding:5px 12px;background:#f8f8f8;border:1px solid #ddd;border-radius:4px;font-size:12px}.sketch-img{max-width:100%;border:1px solid #ccc;margin-top:8px}.comments-box{background:#f8f8f8;border:1px solid #ddd;border-radius:4px;padding:10px;white-space:pre-wrap;font-size:12px;min-height:40px}.share-bar{position:fixed;bottom:0;left:0;right:0;background:#1a1a2e;padding:14px 20px;display:flex;gap:10px;justify-content:center}.share-btn{padding:12px 24px;border-radius:10px;border:none;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}.share-print{background:#c0392b;color:#fff}.share-close{background:#555;color:#fff}@media print{.share-bar{display:none!important}body{padding:15px}}</style></head><body>
+      <div class="header"><h1>${headerTitle}</h1><div class="date">${new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"})}</div></div>
+      <div class="section"><div class="section-title">Customer Information</div><div class="info-grid">
+        <div class="info-row"><span class="info-label">Customer:</span> ${customerName}</div>
+        <div class="info-row"><span class="info-label">PO #:</span> ${poNumber||"N/A"}</div>
+        <div class="info-row"><span class="info-label">Contact:</span> ${customerContact||"N/A"}</div>
+        <div class="info-row"><span class="info-label">Type:</span> ${orderType}</div>
+      </div></div>
+      <div class="section"><div class="section-title">Panel Order${panelEntries.length>1?` (${panelEntries.length} panels)`:""}</div>
+        <table><thead><tr><th>#</th><th>Panel</th><th style="text-align:center">Gauge</th><th>Color</th><th style="text-align:center">Qty</th><th style="text-align:center">Length</th></tr></thead><tbody>${panelsHTML}</tbody></table></div>
+      <div class="section"><div class="section-title">Trim Pieces</div>
+        <div class="info-row" style="margin-bottom:8px"><span class="info-label">Trim Color:</span> ${trimColorDisplay||"N/A"}</div>
+        <table><thead><tr><th>Trim Piece</th><th style="text-align:center">Qty</th><th style="text-align:center">Length</th></tr></thead><tbody>${trimListHTML}</tbody></table></div>
+      <div class="section"><div class="section-title">Accessories</div>
+        ${acc.length?`<div class="acc-list">${acc.map(a=>`<div class="acc-item">${a}</div>`).join("")}</div>`:'<p style="color:#999">None selected</p>'}</div>
+      ${hasCustomTrim&&sketchDataUrl?`<div class="section"><div class="section-title">Custom Trim Sketch</div><img src="${sketchDataUrl}" class="sketch-img" /></div>`:""}
+      ${comments.trim()?`<div class="section"><div class="section-title">Additional Notes / Measurements</div><div class="comments-box">${comments.replace(/</g,"&lt;").replace(/\n/g,"<br>")}</div></div>`:""}
+      <div class="share-bar">
+        <button class="share-btn share-print" onclick="window.print()">Save / Share PDF</button>
+        <button class="share-btn share-close" onclick="window.close()">Close</button>
+      </div>
+    </body></html>`;
+    const w = window.open("","_blank");
+    if(w){w.document.write(html);w.document.close()}
+    else{alert("Please allow popups to generate the PDF.")}
     setGenerating(false);
   };
 
