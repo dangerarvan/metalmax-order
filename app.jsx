@@ -608,21 +608,6 @@ function MetalMaxOrderForm() {
                     );
                   })}
                 </div>
-
-                {/* ─── RIDGE VENT ─── */}
-                <div style={styles.divider} />
-                <label style={styles.label}>Ridge Vent</label>
-                <Checkbox label={hasExposed && hasHidden ? "Ridge Vent (FlexPro + Snap Z)" : hasExposed ? "Ridge Vent (FlexPro)" : "Ridge Vent (Snap Z)"} checked={ridgeVent} onChange={setRidgeVent} />
-                {ridgeVent && (
-                  <div style={styles.accSubSection}>
-                    {hasExposed && (
-                      <NumberPad label="FlexPro - Linear Feet" value={flexProQty} onChange={setFlexProQty} />
-                    )}
-                    {hasHidden && (
-                      <NumberPad label="Snap Z - Linear Feet" value={snapZQty} onChange={setSnapZQty} />
-                    )}
-                  </div>
-                )}
               </>
             )}
           </div>
@@ -664,6 +649,21 @@ function MetalMaxOrderForm() {
                 <div style={styles.accSubSection}>
                   <Picker label="Rivet Color" options={RIVET_COLORS} value={rivetColor} onChange={setRivetColor} placeholder="Select color..." />
                   <NumberPad label="Quantity" value={rivetQty} onChange={setRivetQty} />
+                </div>
+              )}
+              <div style={styles.divider} />
+              <Checkbox label={hasExposed && hasHidden ? "Ridge Vent (FlexPro + Snap Z)" : hasExposed ? "Ridge Vent (FlexPro)" : hasHidden ? "Ridge Vent (Snap Z)" : "Ridge Vent"} checked={ridgeVent} onChange={setRidgeVent} />
+              {ridgeVent && (
+                <div style={styles.accSubSection}>
+                  {hasExposed && (
+                    <NumberPad label="FlexPro - Linear Feet" value={flexProQty} onChange={setFlexProQty} />
+                  )}
+                  {hasHidden && (
+                    <NumberPad label="Snap Z - Linear Feet" value={snapZQty} onChange={setSnapZQty} />
+                  )}
+                  {!hasExposed && !hasHidden && (
+                    <p style={{ fontSize: 12, color: "#999", fontStyle: "italic" }}>Select a panel first to determine vent type</p>
+                  )}
                 </div>
               )}
             </div>
