@@ -168,6 +168,389 @@ function trimNeedsCleated(name, categories) {
 }
 const RIVET_COLORS = ["Matching Panel Color","Matching Trim Color","Galvalume","White","Black","Brown"];
 
+// ─── VOICE: NICKNAME DICTIONARIES ────────────────────────────────────────────
+// Maps spoken shorthand → exact product names. Speech API transcribes to text,
+// then we fuzzy-match against these + the real names. Corrections get saved
+// to localStorage so the app learns your lingo over time.
+
+const PANEL_NICKNAMES = {
+  // PBR
+  "pbr": "PBR Panel", "p b r": "PBR Panel", "p.b.r.": "PBR Panel",
+  "r panel": "PBR Panel", "are panel": "PBR Panel", "r-panel": "PBR Panel",
+  // PBU
+  "pbu": "PBU Panel", "p b u": "PBU Panel", "p.b.u.": "PBU Panel",
+  // MaxPanel
+  "max panel": "MaxPanel", "max rib": "MaxPanel", "rib panel": "MaxPanel",
+  // MaxStrong
+  "max strong": "MaxStrong Panel", "strong panel": "MaxStrong Panel",
+  // MaxLoc
+  "max loc": "MaxLoc100 Panel", "maxloc": "MaxLoc100 Panel", "max lock": "MaxLoc100 Panel",
+  "loc 100": "MaxLoc100 Panel", "lock 100": "MaxLoc100 Panel",
+  // MaxSeam
+  "max seam": "MaxSeam175 Panel", "maxseam": "MaxSeam175 Panel", "seam 175": "MaxSeam175 Panel",
+  // MaxSnap
+  "max snap": "MaxSnap150 Panel", "maxsnap": "MaxSnap150 Panel", "snap lock": "MaxSnap150 Panel",
+  "snap 150": "MaxSnap150 Panel",
+  // MaxMech150
+  "mech 150": "MaxMech150 Panel", "max mech 150": "MaxMech150 Panel",
+  "mechanical 150": "MaxMech150 Panel", "mech seam": "MaxMech150 Panel",
+  "mechanical seam": "MaxMech150 Panel",
+  // MaxMech200
+  "mech 200": "MaxMech200 Panel", "max mech 200": "MaxMech200 Panel",
+  "mechanical 200": "MaxMech200 Panel",
+  // Board & Batten
+  "board and batten": "Board & Batten Panel", "board & batten": "Board & Batten Panel",
+  "bat and board": "Board & Batten Panel", "batten": "Board & Batten Panel",
+  "b&b": "Board & Batten Panel", "b and b": "Board & Batten Panel",
+  // 5V
+  "5v": "5V Crimp", "five v": "5V Crimp", "5v crimp": "5V Crimp",
+  "five v crimp": "5V Crimp", "5 v": "5V Crimp",
+};
+
+const COLOR_NICKNAMES = {
+  "galvy": "Galvalume", "galv": "Galvalume", "galvalume": "Galvalume",
+  "acg": "Acrylic Coated Galvalume", "acrylic galv": "Acrylic Coated Galvalume",
+  "coated galv": "Acrylic Coated Galvalume",
+  "charcoal": "Charcoal", "char": "Charcoal",
+  "charcoal gray": "Charcoal Gray", "char gray": "Charcoal Gray",
+  "dark gray": "Dark Gray",
+  "dove": "Dove Gray", "dove gray": "Dove Gray",
+  "slate": "Slate Gray", "slate gray": "Slate Gray",
+  "slate blue": "Slate Blue",
+  "dark bronze": "Dark Bronze", "bronze": "Dark Bronze",
+  "medium bronze": "Medium Bronze", "med bronze": "Medium Bronze",
+  "mansard": "Mansard Brown", "mansard brown": "Mansard Brown",
+  "matte black": "Matte Black", "black matte": "Matte Black",
+  "regal white": "Regal White",
+  "regal blue": "Regal Blue",
+  "regal red": "Regal Red",
+  "polar white": "Polar White", "polar": "Polar White",
+  "brilliant white": "Brilliant White",
+  "alamo white": "Alamo White", "alamo": "Alamo White",
+  "solar white": "Solar White", "solar": "Solar White",
+  "stone white": "Stone White",
+  "ash gray": "Ash Gray", "ash": "Ash Gray",
+  "pewter gray": "Pewter Gray", "pewter": "Pewter Gray",
+  "burnished slate": "Burnished Slate", "burnished": "Burnished Slate",
+  "burgundy": "Burgundy",
+  "colonial red": "Colonial Red", "colonial": "Colonial Red",
+  "brite red": "Brite Red", "bright red": "Brite Red",
+  "rustic red": "Rustic Red", "rustic": "Rustic Red",
+  "terra cotta": "Terra Cotta", "terracotta": "Terra Cotta",
+  "hunter green": "Hunter Green", "hunter": "Hunter Green",
+  "evergreen": "Evergreen",
+  "fern green": "Fern Green", "fern": "Fern Green",
+  "hartford green": "Hartford Green", "hartford": "Hartford Green",
+  "hemlock green": "Hemlock Green", "hemlock": "Hemlock Green",
+  "patina green": "Patina Green", "patina": "Patina Green",
+  "ocean blue": "Ocean Blue", "ocean": "Ocean Blue",
+  "gallery blue": "Gallery Blue", "gallery": "Gallery Blue",
+  "copper": "Copper", "copper penny": "Copper Penny",
+  "sandstone": "Sandstone", "sand": "Sandstone",
+  "sierra tan": "Sierra Tan", "sierra": "Sierra Tan",
+  "surrey beige": "Surrey Beige", "surrey": "Surrey Beige",
+  "light stone": "Light Stone",
+  "champagne": "Champagne",
+  "taupe": "Taupe", "tan": "Tan", "brown": "Brown",
+  "black": "Black", "silver": "Silver", "antique": "Antique",
+  "vintage": "Vintage",
+  "cor-ten": "Cor-ten AZP Raw", "corten": "Cor-ten AZP Raw", "raw": "Cor-ten AZP Raw",
+  "pre-weathered": "Pre-Weathered Galvalume", "pre weathered": "Pre-Weathered Galvalume",
+  "tlg black": "TLG Black", "tlg charcoal": "TLG Charcoal Gray",
+  "tlg bronze": "TLG Dark Bronze", "tlg medium bronze": "TLG Medium Bronze",
+  "tlg moonstone": "TLG Moonstone", "moonstone": "TLG Moonstone",
+};
+
+const TRIM_NICKNAMES = {
+  // Shorthand for common trims
+  "z bar": "14Z Bar", "14 z": "14Z Bar", "14 z bar": "14Z Bar",
+  "16 z": "16Z Bar", "16 z bar": "16Z Bar",
+  "box rake": "Box Rake",
+  "cleat": "Cleat",
+  "counter flash": "Counter Flashing", "counter flashing": "Counter Flashing",
+  "end wall": "End Wall", "endwall": "End Wall",
+  "flush eave": "Flush Eave",
+  "hip cap": "Hip Cap", "hip": "Hip Cap",
+  "offset cleat": "Offset Cleat",
+  "pitch change": "Pitch Change/Transition", "transition": "Pitch Change/Transition",
+  "pitch transition": "Pitch Change/Transition",
+  "plumb eave": "Plumb Eave", "plumb": "Plumb Eave",
+  "reglet": "Reglet Flashing", "reglet flashing": "Reglet Flashing",
+  "side wall": "Side Wall", "sidewall": "Side Wall",
+  "single slope": "Single Slope Ridge", "single slope ridge": "Single Slope Ridge",
+  "square eave": "Square Eave",
+  "step rake 14": "Step Rake 14", "step rake 16": "Step Rake 16",
+  "step ridge": "Step Ridge",
+  "valley": "Valley",
+  "vent retainer": "Vent Retainer", "retainer": "Vent Retainer",
+  // PBR trims
+  "base trim": "Base Trim", "base": "Base Trim",
+  "double angle": "Double Angle",
+  "flat sheet": "Flat Sheet", "flat": "Flat Sheet",
+  "ridge cap": "Formed Ridge Cap", "formed ridge": "Formed Ridge Cap",
+  "ridge": "Formed Ridge Cap",
+  "hi side eave": "Hi-Side Eave", "high side eave": "Hi-Side Eave",
+  "hi side parapet": "Hi-Side Parapet", "high side parapet": "Hi-Side Parapet",
+  "parapet": "Hi-Side Parapet",
+  "house rake": "House Rake",
+  "inside corner": "Inside Corner",
+  "inside angle": "Inside Single Angle", "inside single angle": "Inside Single Angle",
+  "j trim": "J-Trim", "j-trim": "J-Trim", "jay trim": "J-Trim",
+  "jamb header": "Jamb Header",
+  "jamb trim": "Jamb Trim", "jamb": "Jamb Trim",
+  "long eave": "Long Eave Trim", "long eave trim": "Long Eave Trim",
+  "outside corner": "Outside Corner",
+  "outside angle": "Outside Single Angle", "outside single angle": "Outside Single Angle",
+  "rake": "Rake", "rake trim": "Rake",
+  "rat guard": "Rat Guard",
+  "short eave": "Short Eave",
+  "skylight": "Skylight Trim", "skylight trim": "Skylight Trim",
+  "tie in": "Tie-In", "tie-in": "Tie-In", "tyin": "Tie-In",
+  "universal ridge": "Universal Ridge", "uni ridge": "Universal Ridge",
+  "wide valley": "Wide Valley",
+  "window cap": "Window Cap", "window": "Window Cap",
+  // Max Panel trims
+  "barn rake": "Barn Rake",
+  "barn ridge": "Barn Ridge",
+  "door edge": "Door Edge",
+  "door jamb": "Door Jamb Wide", "door jamb wide": "Door Jamb Wide",
+  "door post": "Door Post",
+  "fascia": "Fascia",
+  "gable": "Gable",
+  "gutter apron": "Gutter Apron", "gutter": "Gutter Apron",
+  "keystone": "Keystone",
+  "large corner": "Large Corner",
+  "lower gambrel": "Lower Gambrel", "gambrel": "Lower Gambrel",
+  "overhead door jamb": "Overhead Door Jamb", "overhead jamb": "Overhead Door Jamb",
+  "oh door jamb": "OH Door Jamb w/ Drip Edge", "oh jamb drip": "OH Door Jamb w/ Drip Edge",
+  "drip edge": "Residential Drip Edge", "res drip edge": "Residential Drip Edge",
+  "res eave": "Residential Eave", "residential eave": "Residential Eave",
+  "res hip cap": "Residential Hip Cap", "residential hip": "Residential Hip Cap",
+  "res rake": "Residential Rake", "residential rake": "Residential Rake",
+  "res ridge cap": "Residential Ridge Cap", "residential ridge": "Residential Ridge Cap",
+  "res ridge": "Residential Ridge Cap",
+  "res valley": "Residential Valley", "residential valley": "Residential Valley",
+  "round track": "Round Track Cover", "round track cover": "Round Track Cover",
+  "small corner": "Small Corner",
+  "soffit": "Soffit",
+  "square base": "Square Base",
+  "square track": "Square Track Cover Narrow",
+  "upper gambrel": "Upper Gambrel",
+  "wide ridge": "Wide Ridgecap", "wide ridgecap": "Wide Ridgecap", "wide ridge cap": "Wide Ridgecap",
+};
+
+const GAUGE_NICKNAMES = {
+  "22 gauge": "22", "22 ga": "22", "twenty two": "22", "twenty-two": "22",
+  "24 gauge": "24", "24 ga": "24", "twenty four": "24", "twenty-four": "24",
+  "26 gauge": "26", "26 ga": "26", "twenty six": "26", "twenty-six": "26",
+  "29 gauge": "29", "29 ga": "29", "twenty nine": "29", "twenty-nine": "29",
+};
+
+const SURFACE_NICKNAMES = {
+  "striations": "Striations", "striated": "Striations",
+  "flat pan": "Flat Pan", "flat": "Flat Pan",
+  "two bead": "Two Bead", "2 bead": "Two Bead",
+  "pencil rib": "Pencil Rib", "pencil": "Pencil Rib",
+};
+
+// ─── VOICE: FUZZY MATCHING ENGINE ────────────────────────────────────────────
+
+// Load learned corrections from localStorage
+function loadLearnedCorrections() {
+  try { return JSON.parse(localStorage.getItem("mm_voice_corrections") || "{}"); } catch { return {}; }
+}
+function saveCorrection(spoken, correctedTo, category) {
+  try {
+    const corrections = loadLearnedCorrections();
+    if (!corrections[category]) corrections[category] = {};
+    corrections[category][spoken.toLowerCase()] = correctedTo;
+    localStorage.setItem("mm_voice_corrections", JSON.stringify(corrections));
+  } catch {}
+}
+
+// Levenshtein distance for fuzzy matching
+function levenshtein(a, b) {
+  const m = a.length, n = b.length;
+  const d = Array.from({ length: m + 1 }, (_, i) => [i]);
+  for (let j = 1; j <= n; j++) d[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      d[i][j] = a[i-1] === b[j-1] ? d[i-1][j-1] : 1 + Math.min(d[i-1][j], d[i][j-1], d[i-1][j-1]);
+    }
+  }
+  return d[m][n];
+}
+
+// Find best match from a list of options + nickname dict + learned corrections
+function fuzzyMatch(spoken, options, nicknames = {}, category = "") {
+  const s = spoken.toLowerCase().trim();
+  if (!s) return { match: null, confidence: 0, alternatives: [] };
+
+  // 1. Check learned corrections first (highest priority)
+  const learned = loadLearnedCorrections();
+  if (learned[category] && learned[category][s]) {
+    const m = learned[category][s];
+    if (options.includes(m)) return { match: m, confidence: 1, alternatives: [] };
+  }
+
+  // 2. Exact match in options
+  const exactOpt = options.find(o => o.toLowerCase() === s);
+  if (exactOpt) return { match: exactOpt, confidence: 1, alternatives: [] };
+
+  // 3. Exact match in nicknames
+  if (nicknames[s] && options.includes(nicknames[s])) return { match: nicknames[s], confidence: 1, alternatives: [] };
+
+  // 4. Partial/contains match in nicknames
+  const nickEntries = Object.entries(nicknames);
+  for (const [nick, val] of nickEntries) {
+    if (options.includes(val) && (s.includes(nick) || nick.includes(s))) {
+      return { match: val, confidence: 0.85, alternatives: [] };
+    }
+  }
+
+  // 5. Fuzzy match against options and nicknames
+  const scored = options.map(o => {
+    const dist = levenshtein(s, o.toLowerCase());
+    const maxLen = Math.max(s.length, o.length);
+    const score = 1 - dist / maxLen;
+    return { option: o, score };
+  });
+
+  // Also check nicknames with fuzzy
+  for (const [nick, val] of nickEntries) {
+    if (!options.includes(val)) continue;
+    const dist = levenshtein(s, nick);
+    const maxLen = Math.max(s.length, nick.length);
+    const score = 1 - dist / maxLen;
+    scored.push({ option: val, score: score + 0.05 }); // slight bonus for nickname match
+  }
+
+  // Deduplicate and sort
+  const seen = new Set();
+  const unique = scored.filter(x => { if (seen.has(x.option)) return false; seen.add(x.option); return true; });
+  unique.sort((a, b) => b.score - a.score);
+
+  const best = unique[0];
+  if (!best) return { match: null, confidence: 0, alternatives: [] };
+
+  const alts = unique.slice(1, 4).filter(x => x.score > 0.4).map(x => x.option);
+
+  if (best.score > 0.7) return { match: best.option, confidence: best.score, alternatives: alts };
+  if (best.score > 0.5) return { match: best.option, confidence: best.score, alternatives: alts };
+  return { match: null, confidence: 0, alternatives: unique.slice(0, 4).map(x => x.option) };
+}
+
+// Parse numbers from speech text
+function extractNumber(text) {
+  const numWords = { zero:0, one:1, two:2, three:3, four:4, five:5, six:6, seven:7, eight:8, nine:9, ten:10,
+    eleven:11, twelve:12, thirteen:13, fourteen:14, fifteen:15, sixteen:16, seventeen:17, eighteen:18,
+    nineteen:19, twenty:20, thirty:30, forty:40, fifty:50 };
+  // Try direct number
+  const numMatch = text.match(/\d+/);
+  if (numMatch) return parseInt(numMatch[0]);
+  // Try word numbers
+  const words = text.toLowerCase().split(/\s+/);
+  for (const w of words) { if (numWords[w] !== undefined) return numWords[w]; }
+  // Compound: "twenty six" etc
+  for (let i = 0; i < words.length - 1; i++) {
+    const tens = numWords[words[i]];
+    const ones = numWords[words[i+1]];
+    if (tens >= 20 && ones >= 1 && ones <= 9) return tens + ones;
+  }
+  return null;
+}
+
+// ─── VOICE: SPEECH RECOGNITION HOOK ─────────────────────────────────────────
+
+function useSpeechRecognition() {
+  const [listening, setListening] = useState(false);
+  const [transcript, setTranscript] = useState("");
+  const recognitionRef = useRef(null);
+
+  const startListening = useCallback(() => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) { alert("Speech recognition is not supported on this browser."); return; }
+
+    const recognition = new SpeechRecognition();
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = "en-US";
+
+    recognition.onresult = (event) => {
+      const text = event.results[0][0].transcript;
+      setTranscript(text);
+      setListening(false);
+    };
+    recognition.onerror = () => { setListening(false); };
+    recognition.onend = () => { setListening(false); };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+    setListening(true);
+    setTranscript("");
+  }, []);
+
+  const stopListening = useCallback(() => {
+    if (recognitionRef.current) recognitionRef.current.stop();
+    setListening(false);
+  }, []);
+
+  return { listening, transcript, startListening, stopListening, setTranscript };
+}
+
+// ─── VOICE: "DID YOU MEAN?" CONFIRMATION COMPONENT ─────────────────────────
+
+function VoiceConfirm({ label, match, confidence, alternatives, onAccept, onPickAlt, onDismiss, spokenText, category }) {
+  if (!match && alternatives.length === 0) return null;
+  const uncertain = confidence < 0.85;
+  return (
+    <div style={styles.voiceConfirm}>
+      <div style={styles.voiceConfirmHeader}>
+        <span style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: 0.5 }}>{label}</span>
+        <button onClick={onDismiss} style={styles.voiceConfirmX}>✕</button>
+      </div>
+      {match ? (
+        <div>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: uncertain && alternatives.length > 0 ? 8 : 0 }}>
+            <span style={{ fontSize: 15, fontWeight: 700, color: uncertain ? "#e67e22" : "#27ae60" }}>{match}</span>
+            {uncertain && <span style={{ fontSize: 11, color: "#e67e22" }}>(?)</span>}
+            <button onClick={() => { onAccept(match); if (spokenText && category) saveCorrection(spokenText, match, category); }}
+              style={styles.voiceConfirmAccept}>Yes</button>
+          </div>
+          {uncertain && alternatives.length > 0 && (
+            <div>
+              <span style={{ fontSize: 11, color: "#888" }}>Did you mean: </span>
+              {alternatives.map(a => (
+                <button key={a} onClick={() => { onPickAlt(a); if (spokenText && category) saveCorrection(spokenText, a, category); }}
+                  style={styles.voiceConfirmAlt}>{a}</button>
+              ))}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div>
+          <span style={{ fontSize: 13, color: "#999" }}>No match found. Did you mean:</span>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 4 }}>
+            {alternatives.map(a => (
+              <button key={a} onClick={() => { onPickAlt(a); if (spokenText && category) saveCorrection(spokenText, a, category); }}
+                style={styles.voiceConfirmAlt}>{a}</button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MicButton({ listening, onClick, style: extraStyle }) {
+  return (
+    <button onClick={onClick}
+      style={{ ...styles.micBtn, ...(listening ? styles.micBtnActive : {}), ...extraStyle }}>
+      {listening ? "..." : "🎤"}
+    </button>
+  );
+}
+
 const FEET_OPTIONS = Array.from({ length: 51 }, (_, i) => i);
 const INCHES_OPTIONS = Array.from({ length: 12 }, (_, i) => i);
 
@@ -394,6 +777,116 @@ function MetalMaxOrderForm() {
   const toggleTrim = (t) => { setTrimItems((prev) => { const ex = prev.find((i) => i.name === t); if (ex) return prev.filter((i) => i.name !== t); return [...prev, { name: t, qty: 1, feet: "10", inches: "6", pitch: "", pitchTo: "", cleated: false }]; }); };
   const updateTrimItem = (name, field, value) => { setTrimItems((prev) => prev.map((i) => (i.name === name ? { ...i, [field]: value } : i))); };
 
+  // ─── VOICE ──────────────────────────────────────────────────────────────────
+  const voice = useSpeechRecognition();
+  const [voiceMode, setVoiceMode] = useState(null); // "panel", "trim", or null
+  const [voiceParsed, setVoiceParsed] = useState(null); // parsed results awaiting confirmation
+
+  // Parse panel dictation: "PBR 26 gauge charcoal 12 pieces 18 foot 6 inches"
+  useEffect(() => {
+    if (!voice.transcript || voiceMode !== "panel") return;
+    const raw = voice.transcript.toLowerCase();
+    const parts = raw.replace(/,/g, "").replace(/\./g, "");
+    const panelNames = Object.keys(PANELS);
+    const panelMatch = fuzzyMatch(parts, panelNames, PANEL_NICKNAMES, "panel");
+
+    // Find gauge
+    let gaugeVal = null;
+    const gMatch = parts.match(/(\d{2})\s*(gauge|ga\b)/);
+    if (gMatch) gaugeVal = gMatch[1];
+    else { for (const [nick, val] of Object.entries(GAUGE_NICKNAMES)) { if (parts.includes(nick)) { gaugeVal = val; break; } } }
+
+    // Find color - try longest nickname match first
+    let colorVal = null;
+    const allColors = [...new Set(Object.values(COLORS_BY_GAUGE).flat())];
+    const sortedColorNicks = Object.entries(COLOR_NICKNAMES).sort((a, b) => b[0].length - a[0].length);
+    for (const [nick, val] of sortedColorNicks) { if (parts.includes(nick) && allColors.includes(val)) { colorVal = val; break; } }
+    if (!colorVal) {
+      // Try matching against actual color names
+      const sortedColors = [...allColors].sort((a, b) => b.length - a.length);
+      for (const c of sortedColors) { if (parts.includes(c.toLowerCase())) { colorVal = c; break; } }
+    }
+
+    // Find piece count: "12 pieces" or "12 pcs" or just a standalone number after color context
+    let pieceCount = null;
+    const pcMatch = parts.match(/(\d+)\s*(piece|pieces|pcs|pc|count)/);
+    if (pcMatch) pieceCount = parseInt(pcMatch[1]);
+
+    // Find length: "18 foot/feet" and "6 inch/inches"
+    let feet = null, inches = null;
+    const ftMatch = parts.match(/(\d+)\s*(foot|feet|ft)/);
+    if (ftMatch) feet = ftMatch[1];
+    const inMatch = parts.match(/(\d+)\s*(inch|inches|in\b)/);
+    if (inMatch) inches = inMatch[1];
+
+    // Surface variation for standing seam
+    let surface = null;
+    if (panelMatch.match && PANELS[panelMatch.match]?.isStandingSeam) {
+      const surfMatch = fuzzyMatch(parts, SURFACE_VARIATIONS, SURFACE_NICKNAMES, "surface");
+      if (surfMatch.match && surfMatch.confidence > 0.6) surface = surfMatch.match;
+    }
+
+    // Color match refinement with available colors for matched gauge
+    let colorConfidence = colorVal ? 0.9 : 0;
+    let colorAlts = [];
+    if (colorVal && gaugeVal) {
+      const available = (COLORS_BY_GAUGE[gaugeVal] || []).sort();
+      if (!available.includes(colorVal)) {
+        // Color exists but not in this gauge — find closest match in gauge
+        const reMatch = fuzzyMatch(colorVal.toLowerCase(), available, COLOR_NICKNAMES, "color");
+        colorVal = reMatch.match;
+        colorConfidence = reMatch.confidence;
+        colorAlts = reMatch.alternatives;
+      }
+    }
+
+    setVoiceParsed({
+      type: "panel",
+      raw: voice.transcript,
+      panel: panelMatch,
+      gauge: gaugeVal,
+      color: { match: colorVal, confidence: colorConfidence, alternatives: colorAlts, spoken: raw },
+      pieces: pieceCount,
+      feet, inches, surface
+    });
+  }, [voice.transcript, voiceMode]);
+
+  // Parse trim dictation: "valley" or "ridge cap" or "inside corner"
+  useEffect(() => {
+    if (!voice.transcript || voiceMode !== "trim") return;
+    const raw = voice.transcript.toLowerCase().replace(/,/g, "").replace(/\./g, "");
+    const trimMatch = fuzzyMatch(raw, availableTrim, TRIM_NICKNAMES, "trim");
+    setVoiceParsed({ type: "trim", raw: voice.transcript, trim: trimMatch });
+  }, [voice.transcript, voiceMode]);
+
+  const startPanelVoice = () => { setVoiceMode("panel"); setVoiceParsed(null); voice.startListening(); };
+  const startTrimVoice = () => { setVoiceMode("trim"); setVoiceParsed(null); voice.startListening(); };
+  const dismissVoice = () => { setVoiceParsed(null); voice.setTranscript(""); };
+
+  const applyPanelVoice = (parsed, overrides = {}) => {
+    const last = panelEntries[panelEntries.length - 1];
+    const updated = { ...last };
+    if (overrides.panel || parsed.panel?.match) updated.panel = overrides.panel || parsed.panel.match;
+    if (parsed.gauge) updated.gauge = parsed.gauge;
+    if (overrides.color || parsed.color?.match) updated.color = overrides.color || parsed.color.match;
+    if (parsed.surface) updated.surface = parsed.surface;
+    if (parsed.pieces) updated.pieceCount = parsed.pieces;
+    if (parsed.feet) updated.feet = parsed.feet;
+    if (parsed.inches) updated.inches = parsed.inches;
+    // Reset dependent fields if panel changed
+    if (updated.panel !== last.panel) { updated.gauge = parsed.gauge || ""; updated.color = ""; updated.surface = ""; }
+    if (updated.gauge !== last.gauge) { updated.color = overrides.color || parsed.color?.match || ""; }
+    updatePanelEntry({ ...updated, id: last.id });
+    setVoiceParsed(null);
+    voice.setTranscript("");
+  };
+
+  const applyTrimVoice = (trimName) => {
+    if (!trimItems.find(i => i.name === trimName)) toggleTrim(trimName);
+    setVoiceParsed(null);
+    voice.setTranscript("");
+  };
+
   const STEPS = [
     { title: "Customer Info", valid: customerName.trim() && orderType },
     { title: "Panel Selection", valid: allPanelsValid },
@@ -542,6 +1035,50 @@ function MetalMaxOrderForm() {
         {step === 1 && (
           <div style={styles.section}>
             <SectionHeader number="2" title="Panel Selection" subtitle={`${panelEntries.length} panel${panelEntries.length > 1 ? "s" : ""} on this order`} />
+            <div style={styles.voiceBar}>
+              <MicButton listening={voice.listening && voiceMode === "panel"} onClick={voice.listening ? voice.stopListening : startPanelVoice} />
+              <span style={styles.voiceTranscript}>
+                {voice.listening && voiceMode === "panel" ? "Listening... say panel, gauge, color, pieces, length" : voice.transcript && voiceMode === "panel" ? `"${voice.transcript}"` : "Tap mic to dictate panel info"}
+              </span>
+            </div>
+            {voiceParsed?.type === "panel" && (
+              <div style={styles.voiceConfirm}>
+                <div style={styles.voiceConfirmHeader}>
+                  <span style={{ fontSize: 11, color: "#888", textTransform: "uppercase", letterSpacing: 0.5 }}>Voice Result</span>
+                  <button onClick={dismissVoice} style={styles.voiceConfirmX}>✕</button>
+                </div>
+                {voiceParsed.panel?.match && (
+                  <VoiceConfirm label="Panel" match={voiceParsed.panel.match} confidence={voiceParsed.panel.confidence}
+                    alternatives={voiceParsed.panel.alternatives} spokenText={voiceParsed.raw} category="panel"
+                    onAccept={() => applyPanelVoice(voiceParsed)}
+                    onPickAlt={(alt) => applyPanelVoice(voiceParsed, { panel: alt })}
+                    onDismiss={dismissVoice} />
+                )}
+                {!voiceParsed.panel?.match && voiceParsed.panel?.alternatives?.length > 0 && (
+                  <VoiceConfirm label="Panel" match={null} confidence={0}
+                    alternatives={voiceParsed.panel.alternatives} spokenText={voiceParsed.raw} category="panel"
+                    onAccept={() => {}} onPickAlt={(alt) => applyPanelVoice(voiceParsed, { panel: alt })} onDismiss={dismissVoice} />
+                )}
+                {voiceParsed.color?.match && voiceParsed.color?.confidence < 0.85 && (
+                  <VoiceConfirm label="Color" match={voiceParsed.color.match} confidence={voiceParsed.color.confidence}
+                    alternatives={voiceParsed.color.alternatives} spokenText={voiceParsed.color.spoken} category="color"
+                    onAccept={(c) => applyPanelVoice(voiceParsed, { color: c })}
+                    onPickAlt={(alt) => applyPanelVoice(voiceParsed, { color: alt })}
+                    onDismiss={dismissVoice} />
+                )}
+                {voiceParsed.panel?.match && voiceParsed.panel?.confidence >= 0.85 && (!voiceParsed.color?.match || voiceParsed.color?.confidence >= 0.85) && (
+                  <div style={{ marginTop: 6 }}>
+                    <div style={{ fontSize: 12, color: "#555", marginBottom: 4 }}>
+                      {[voiceParsed.panel.match, voiceParsed.gauge && `${voiceParsed.gauge}ga`, voiceParsed.color?.match,
+                        voiceParsed.surface, voiceParsed.pieces && `${voiceParsed.pieces}pcs`,
+                        voiceParsed.feet && `${voiceParsed.feet}'${voiceParsed.inches ? voiceParsed.inches + '"' : ""}`
+                      ].filter(Boolean).join(" / ")}
+                    </div>
+                    <button onClick={() => applyPanelVoice(voiceParsed)} style={styles.voiceConfirmAccept}>Apply All</button>
+                  </div>
+                )}
+              </div>
+            )}
             {panelEntries.map((entry, idx) => (
               <PanelEntryCard key={entry.id} entry={entry} index={idx} total={panelEntries.length} onUpdate={updatePanelEntry} onRemove={removePanelEntry} />
             ))}
@@ -559,6 +1096,19 @@ function MetalMaxOrderForm() {
               <p style={styles.noPanel}>Please select a panel first to see available trim.</p>
             ) : (
               <>
+                <div style={styles.voiceBar}>
+                  <MicButton listening={voice.listening && voiceMode === "trim"} onClick={voice.listening ? voice.stopListening : startTrimVoice} />
+                  <span style={styles.voiceTranscript}>
+                    {voice.listening && voiceMode === "trim" ? "Listening... say a trim piece name" : voice.transcript && voiceMode === "trim" ? `"${voice.transcript}"` : "Tap mic to add trim by voice"}
+                  </span>
+                </div>
+                {voiceParsed?.type === "trim" && (
+                  <VoiceConfirm label="Trim Piece" match={voiceParsed.trim.match} confidence={voiceParsed.trim.confidence}
+                    alternatives={voiceParsed.trim.alternatives} spokenText={voiceParsed.raw} category="trim"
+                    onAccept={(t) => applyTrimVoice(t)}
+                    onPickAlt={(alt) => applyTrimVoice(alt)}
+                    onDismiss={dismissVoice} />
+                )}
                 <Checkbox label={`Same color as panel (${firstComplete?.color || "none"})`} checked={sameColorTrim} onChange={setSameColorTrim} />
                 {!sameColorTrim && <Picker label="Trim Color" options={trimColorOptions} value={trimColor} onChange={setTrimColor} placeholder="Select trim color..." />}
                 <div style={styles.divider} />
@@ -829,4 +1379,14 @@ const styles = {
   navNext: { padding:"12px 24px",borderRadius:10,border:"none",background:"#e74c3c",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer" },
   navDisabled: { opacity:0.4,cursor:"not-allowed" },
   navGenerate: { padding:"12px 24px",borderRadius:10,border:"none",background:"#27ae60",color:"#fff",fontSize:14,fontWeight:700,cursor:"pointer" },
+  // Voice
+  micBtn: { width:36,height:36,borderRadius:"50%",border:"2px solid #ddd",background:"#fff",fontSize:16,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",flexShrink:0 },
+  micBtnActive: { borderColor:"#e74c3c",background:"#fef5f4",animation:"pulse 1s infinite" },
+  voiceConfirm: { background:"#fffbf0",border:"2px solid #f0c040",borderRadius:10,padding:12,marginBottom:12 },
+  voiceConfirmHeader: { display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6 },
+  voiceConfirmX: { background:"none",border:"none",fontSize:14,color:"#999",cursor:"pointer",padding:4 },
+  voiceConfirmAccept: { padding:"4px 12px",borderRadius:6,border:"none",background:"#27ae60",color:"#fff",fontSize:12,fontWeight:700,cursor:"pointer",marginLeft:8 },
+  voiceConfirmAlt: { padding:"4px 10px",borderRadius:6,border:"1px solid #ddd",background:"#fff",fontSize:12,cursor:"pointer",marginRight:4,marginTop:4 },
+  voiceBar: { display:"flex",alignItems:"center",gap:8,padding:"8px 0",marginBottom:8 },
+  voiceTranscript: { flex:1,fontSize:12,color:"#888",fontStyle:"italic",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap" },
 };
